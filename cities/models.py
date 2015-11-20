@@ -25,32 +25,33 @@ class PlaceManager(models.GeoManager):
     Custom Manager class for the Place model.
     """
 
-    def nearest_to(self, point, range_in_miles=10):
+    def nearest_to(self, point, range_in_miles=None):
         """
         Find the place nearest to the point specified.
         :param point: A point in the world (lat, long)
         :type point: django.contrib.gis.geos.point.Point
         :param range_in_miles: Number of miles that the search should be valid within.  If nothing is found within the
-            mileage specified, then nearest_to returns a None.
+            mileage specified, then nearest_to returns a None.  Defaults to None which equates to no distance
+            limitation.
         :type range_in_miles: int
         :return: Return the Place nearest to the point.
         :rtype: Place
         """
-        try:
-            place_candidates = self.filter(location__distance_lte=(point, D(mi=range_in_miles))).\
-                distance(point).order_by('distance')
-        except FieldError:
-            msg = "{model} does not have a location field to search by.  Implement a meaningful nearest_to func " \
-                  "if you need this feature.".format(model=self.model)
-            LOG.debug(msg)
-            raise FieldError(msg)
+        place_candidates = self.all()
+        if range_in_miles:
+            try:
+                place_candidates = self.filter(location__distance_lte=(point, D(mi=range_in_miles)))
+            except FieldError:
+                msg = "Specifying a range_in_miles requires {model} to have a location field to search by.  " \
+                      "Implement a meaningful nearest_to func if you need this feature.".format(model=self.model)
+                LOG.debug(msg)
+                raise FieldError(msg)
 
         try:
-            return place_candidates[0]
+            return place_candidates.distance(point).order_by('distance')[0]
         except IndexError:
-            LOG.debug("No Place candidates near to {point}.  Max mileage was: {mileage}.".format(point=point,
-                                                                                                 mileage=range_in_miles)
-                      )
+            LOG.debug("No Place candidates near to {point}.  Max mileage was {mileage}.".
+                      format(point=point, mileage=range_in_miles if range_in_miles else "not considered."))
             return None
 
 
@@ -78,6 +79,21 @@ class Place(models.Model):
     def __str__(self):
         return force_text(self.name)
 
+
+class CountryManager(PlaceManager):
+    """ Manager for Country Model
+    """
+
+    def nearest_to(self, point, range_in_miles=None):
+        """
+        Coutry implementation of Place::nearest_to.
+        """
+        nearest_city = City.objects.nearest_to(point, range_in_miles)
+        """ :type : cities.models.City """
+
+        return nearest_city.country if nearest_city else None
+
+
 class Country(Place):
     code = models.CharField(max_length=2, db_index=True)
     code3 = models.CharField(max_length=3, db_index=True)
@@ -91,6 +107,8 @@ class Country(Place):
     tld = models.CharField(max_length=5)
     capital = models.CharField(max_length=100)
     neighbours = models.ManyToManyField("self")
+
+    objects = CountryManager()
 
     class Meta:
         ordering = ['name']
