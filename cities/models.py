@@ -38,6 +38,7 @@ class PlaceManager(models.GeoManager):
         :rtype: Place
         """
         place_candidates = self.all()
+
         if range_in_miles:
             try:
                 place_candidates = self.filter(location__distance_lte=(point, D(mi=range_in_miles)))
@@ -49,6 +50,9 @@ class PlaceManager(models.GeoManager):
 
         try:
             return place_candidates.distance(point).order_by('distance')[0]
+        except TypeError as exc:
+            LOG.debug("{model} doesn't appear to be compatible with a distance call.".format(model=self.model))
+            raise      # re-raise.
         except IndexError:
             LOG.debug("No Place candidates near to {point}.  Max mileage was {mileage}.".
                       format(point=point, mileage=range_in_miles if range_in_miles else "not considered."))
