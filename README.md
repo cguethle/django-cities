@@ -124,6 +124,11 @@ This repository contains an example project which lets you browse the place hier
 >>> london = City.objects.filter(country__name='United Kingdom').get(name='London')
 >>> nearest = City.objects.distance(london.location).exclude(id=london.id).order_by('distance')[:5]
 
+# Nearest City to a Longitude/Latitude Point
+>>> my_point = Point(-96.8028, 32.7791)
+>>> City.objects.nearest_to(my_point)
+<City: Dallas>
+
 # All cities in a state or county
 >>> City.objects.filter(country__code="US", region__code="TX")
 >>> City.objects.filter(country__name="United States", subregion__name="Orange County")
