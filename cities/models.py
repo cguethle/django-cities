@@ -122,10 +122,28 @@ class Country(Place):
     def parent(self):
         return None
 
+
+class RegionManager(PlaceManager):
+    """ Manager for Region Model
+    """
+    def get_full_index(self, queryset=None):
+        """
+        Return Regions with their associated full codes in an efficient way.  Since full_code for Region requires an
+         additional lookup to country, it is prohibitively expensive to do this without select_related.
+        :param queryset: Existing queryset to build on.
+        :return:
+        """
+        queryset = queryset or self.all()
+        regions = queryset.select_related('country')
+
+        return {r.full_code(): r for r in regions}
+
 class Region(Place):
     name_std = models.CharField(max_length=200, db_index=True, verbose_name="standard name")
     code = models.CharField(max_length=200, db_index=True)
     country = models.ForeignKey(Country)
+
+    objects = RegionManager()
 
     @property
     def parent(self):
@@ -134,10 +152,29 @@ class Region(Place):
     def full_code(self):
         return ".".join([self.parent.code, self.code])
 
+
+class SubregionManager(PlaceManager):
+    """ Manager for Region Model
+    """
+    def get_full_index(self, queryset=None):
+        """
+        Return Regions with their associated full codes in an efficient way.  Since full_code for Region requires an
+         additional lookup to country, it is prohibitively expensive to do this without select_related.
+        :param queryset: Existing queryset to build on.
+        :return:
+        """
+        queryset = queryset or self.all()
+        subregions = queryset.select_related('region', 'region__country')
+
+        return {r.full_code(): r for r in subregions}
+
+
 class Subregion(Place):
     name_std = models.CharField(max_length=200, db_index=True, verbose_name="standard name")
     code = models.CharField(max_length=200, db_index=True)
     region = models.ForeignKey(Region)
+
+    objects = SubregionManager()
 
     @property
     def parent(self):
@@ -145,6 +182,7 @@ class Subregion(Place):
 
     def full_code(self):
         return ".".join([self.parent.parent.code, self.parent.code, self.code])
+
 
 class City(Place):
     name_std = models.CharField(max_length=200, db_index=True, verbose_name="standard name")
@@ -164,6 +202,7 @@ class City(Place):
     def parent(self):
         return self.region
 
+
 class District(Place):
     name_std = models.CharField(max_length=200, db_index=True, verbose_name="standard name")
     location = models.PointField()
@@ -173,6 +212,7 @@ class District(Place):
     @property
     def parent(self):
         return self.city
+
 
 @python_2_unicode_compatible
 class AlternativeName(models.Model):
@@ -184,6 +224,7 @@ class AlternativeName(models.Model):
 
     def __str__(self):
         return "%s (%s)" % (force_text(self.name), force_text(self.language))
+
 
 @python_2_unicode_compatible
 class PostalCode(Place):
@@ -221,4 +262,3 @@ class PostalCode(Place):
 
     def __str__(self):
         return force_text(self.code)
-    

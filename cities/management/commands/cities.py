@@ -48,6 +48,8 @@ _transact = (transaction.commit_on_success if django.VERSION < (1, 6) else
 
 
 class Command(BaseCommand):
+    region_index = None
+
     app_dir = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + '/../..')
     data_dir = os.path.join(app_dir, 'data')
     logger = logging.getLogger("cities")
@@ -240,7 +242,7 @@ class Command(BaseCommand):
         if uptodate and not self.force: return
         data = self.get_data('region')
         self.build_country_index()
-                
+
         self.logger.info("Importing region data")
         for item in data:
             if not self.call_hook('region_pre', item): continue
@@ -266,12 +268,12 @@ class Command(BaseCommand):
             self.logger.debug("Added region: %s, %s", item['code'], region)
         
     def build_region_index(self):
-        if hasattr(self, 'region_index'): return
+        if self.region_index:
+            return
         
         self.logger.info("Building region index")
-        self.region_index = {}
-        for obj in chain(Region.objects.all(), Subregion.objects.all()):
-            self.region_index[obj.full_code()] = obj
+        self.region_index = Region.objects.get_full_index()
+        self.region_index.update(Subregion.objects.get_full_index())
             
     def import_subregion(self):
         uptodate = self.download('subregion')
